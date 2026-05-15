@@ -22,6 +22,51 @@ A highly responsive, production-focused single-page application engineered for p
 
 ---
 
+## 📂 Repository Structural Layout
+
+The system follows a clean modular component architecture separating application context layers from structural user interface cards:
+
+```text
+ReperOSWeb/
+├── src/
+│   ├── components/
+│   │   ├── Inventory.jsx       # Master catalog list controller & backup manager
+│   │   └── SetlistBuilder.jsx  # Active gig workspace & high-fidelity PDF canvas export
+│   ├── context/
+│   │   └── RepertoireContext.jsx # Global state engine wrapper using LocalStorage pipelines
+│   ├── App.jsx                 # Base layout core container framework
+│   ├── main.jsx                # Application build lifecycle mounting script
+│   └── index.css               # Unified Tailwind CSS directive layers
+├── public/                     # Static production asset directory
+├── package.json                # Project environment layout dependency manifesto
+└── vite.config.js              # Vite compiler optimization properties
+```
+
+---
+
+## 💾 Core Data Model Interface Specs
+
+When backup workflows compile arrays into external portable `.json` snapshot packages, objects adhere strictly to the following declarative TypeScript specification:
+
+```typescript
+interface SongObject {
+  id: string;          // Cryptographically assigned unique primitive hash token
+  name: string;        // Absolute Title of the performance asset
+  artist?: string;     // Optional tracking string representing band/performer profile
+  key?: string;        // Dynamic key tuning scale designation (e.g., "Am", "F#")
+  bpm?: number;        // Quantifiable numerical cadence beat notation mapping variable
+  voiceType: string;   // Structural vocal registry designation (e.g., "Tenor", "Soprano")
+}
+
+interface SetlistObject {
+  id: string;          // Unique show timeline index sequence reference key
+  name: string;        // Human-readable identifier designating show name or event date
+  songIds: string[];   // Relational index pointers linking directly back to song array objects
+}
+```
+
+---
+
 ## 🛠️ Technology Ecosystem Stack
 
 * **React 18** — Component-driven operational architecture handling predictable state rendering trees.
@@ -34,11 +79,11 @@ A highly responsive, production-focused single-page application engineered for p
 
 ## 📦 Local Workspace Bootstrapping
 
-Ensure you have [Node.js](https://nodejs.org/) installed on your host machine. Execute these terminal primitives to spin up the local environment:
+Ensure you have Node.js installed on your host machine. Execute these terminal primitives to spin up the local environment:
 
 ```bash
 # 1. Clone the version-controlled repository system
-git clone [https://github.com/YOUR_ACCOUNT/ReperOSWeb.git](https://github.com/YOUR_ACCOUNT/ReperOSWeb.git)
+git clone https://github.com/YOUR_ACCOUNT/ReperOSWeb.git
 
 # 2. Navigate straight into the project root folder tree
 cd ReperOSWeb
@@ -48,3 +93,39 @@ npm install
 
 # 4. Initialize the localized hot-reloading development server
 npm run dev
+```
+
+---
+
+## ☁️ Cloud Production Deployment
+
+The software is optimized to build as a zero-dependency, static client-side web application. To deploy your workspace safely into a public or private cloud pipeline using **Vercel**, deploy directly from the CLI toolchain:
+
+```bash
+# 1. Global installation of the cloud management client binaries
+npm install -g vercel
+
+# 2. Trigger automated cloud workspace setup routines
+vercel
+```
+
+### Deployment Configuration Choices
+
+When prompted by the interactive terminal workflow, configure the project utilizing these target configurations:
+
+1. `Set up and deploy ...?` -> **`Y`** (or press `Enter`)
+2. `Which scope...?` -> Press `Enter` to select your default user scope.
+3. `Link to existing project?` -> **`N`** (Creates a brand new tracking instance)
+4. `What’s your project’s name?` -> **`reperos`** *(Must be fully lowercase)*
+5. `In which directory is your code located?` -> Press `Enter` to target current root `./`
+6. `Want to override settings? / Change additional settings?` -> **`N`** *(Vercel will natively map the optimal Vite engine build scripts automatically)*
+
+---
+
+## 🗺️ Future Roadmap Architecture
+
+* [x] High-performance native jsPDF layout generation overhaul.
+* [x] Standard US Letter automated margin distribution refactor.
+* [ ] Implement secure cloud account synchronization capabilities (Firebase/Supabase database integrations).
+* [ ] Add interactive track sorting drag-and-drop interfaces using `@hello-pangea/dnd`.
+* [ ] Include automated setlist time-duration summation metrics based on standard song tempos.
