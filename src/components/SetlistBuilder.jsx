@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useRepertoire } from '../context/RepertoireContext';
-import { FileDown, Plus, Trash2, ListMusic, Layers } from 'lucide-react';
+import { FileDown, Plus, Trash2, ListMusic, Layers, Eye } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
-export default function SetlistBuilder() {
+export default function SetlistBuilder({ isMobile, onMobileExpand }) {
     const {
         songs, setlists, createSetlist, deleteSetlist,
         activeSetlistId, setActiveSetlistId, removeSongFromSetlist, darkMode
@@ -94,11 +94,21 @@ export default function SetlistBuilder() {
                 }
                 pdf.text(songHeaderString, 34, currentY + 1);
 
-                // Render Performance Spec Sub-badges (Key, BPM, Vocals)
+                // Render Performance Spec Sub-badges (Duration, Key, BPM, Vocals)
                 pdf.setFont('Helvetica', 'normal');
                 pdf.setFontSize(9);
 
                 let metaSegmentX = 34;
+
+                if (song.duration) {
+                    pdf.setTextColor(59, 130, 246); // blue-500 duration text color
+                    pdf.text(song.duration, metaSegmentX, currentY + 5.5);
+                    metaSegmentX += pdf.getTextWidth(song.duration) + 3;
+
+                    pdf.setTextColor(212, 212, 216); // zinc-300 delimiter point dot
+                    pdf.text('·', metaSegmentX, currentY + 5.5);
+                    metaSegmentX += 3;
+                }
 
                 if (song.key) {
                     pdf.setTextColor(217, 119, 6); // amber-600 key tuning text color
@@ -192,13 +202,28 @@ export default function SetlistBuilder() {
                             <ListMusic size={18} /> Lineup
                         </span>
                         <div className="flex gap-2">
-                            <button
-                                onClick={handleExportPDF}
-                                disabled={setlistSongs.length === 0}
-                                className="bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                            >
-                                <FileDown size={14} /> Export PDF
-                            </button>
+                            {/* Omit PDF Generation engine render block context if executed within APK bundle wrapper */}
+                            {!isMobile && (
+                                <button
+                                    onClick={handleExportPDF}
+                                    disabled={setlistSongs.length === 0}
+                                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                >
+                                    <FileDown size={14} /> Export PDF
+                                </button>
+                            )}
+
+                            {/* Trigger viewport matrix expansion swap if executing workspace context within a mobile device */}
+                            {isMobile && (
+                                <button
+                                    onClick={() => onMobileExpand(currentSetlist.id)}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                                    title="Open Live Stage Viewport"
+                                >
+                                    <Eye size={14} /> Live View
+                                </button>
+                            )}
+
                             <button
                                 onClick={() => deleteSetlist(currentSetlist.id)}
                                 className={`p-1.5 rounded-md border transition-colors cursor-pointer ${darkMode ? 'bg-zinc-800 hover:bg-red-950/40 border-zinc-700 text-red-400' : 'bg-zinc-100 hover:bg-red-50 border-zinc-200 text-red-600'
@@ -240,6 +265,8 @@ export default function SetlistBuilder() {
                                                 </div>
 
                                                 <div className="flex gap-2 mt-0.5 text-[11px] font-medium">
+                                                    {song.duration && <span className="text-blue-500">{song.duration}</span>}
+                                                    {song.duration && (song.key || song.bpm) && <span className="text-zinc-600">·</span>}
                                                     {song.key && <span className="text-amber-500">{song.key}</span>}
                                                     {song.key && song.bpm && <span className="text-zinc-600">·</span>}
                                                     {song.bpm && <span className="text-red-400">{song.bpm} BPM</span>}

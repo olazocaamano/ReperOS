@@ -1,81 +1,154 @@
+// src/context/RepertoireContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { db } from '../firebase';
+import {
+    collection,
+    onSnapshot,
+    addDoc,
+    deleteDoc,
+    doc,
+    updateDoc,
+    arrayUnion,
+    arrayRemove
+} from 'firebase/firestore';
 
 const RepertoireContext = createContext();
 
 export function RepertoireProvider({ children }) {
-    const [songs, setSongs] = useLocalStorage('repro-songs', []);
-    const [setlists, setSetlists] = useLocalStorage('repro-setlists', []);
-    const [darkMode, setDarkMode] = useLocalStorage('repro-theme', true); // Defaulting to Dark Mode
-    const [editingSong, setEditingSong] = useState(null);
+    const [songs, setSongs] = useState([]);
+    const [setlists, setSetlists] = useState([]);
     const [activeSetlistId, setActiveSetlistId] = useState('');
+    const [darkMode, setDarkMode] = useState(() => {
+        return localStorage.getItem('darkMode') === 'true';
+    });
 
-    // Add a new song to the global repertoire
-    const addSong = (song) => {
-        setSongs([...songs, { ...song, id: Date.now().toString() }]);
+    // UI Theme persistence pipeline mapping
+    useEffect(() => {
+        localStorage.setItem('darkMode', darkMode);
+        if (darkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, [darkMode]);
+
+    // 1. Synchronize Master Songs Inventory Collection in Real-Time
+    useEffect(() => {
+        const songsRef = collection(db, 'songs');
+        const unsubscribe = onSnapshot(songsRef, (snapshot) => {
+            const songsList = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setSongs(songsList);
+        }, (error) => console.error("Firestore songs sync breakdown:", error));
+
+        return () => unsubscribe();
+    }, []);
+
+    // 2. Synchronize Show Setlists Collection in Real-Time
+    useEffect(() => {
+        const setlistsRef = collection(db, 'setlists');
+        const unsubscribe = onSnapshot(setlistsRef, (snapshot) => {
+            const setlistsList = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setSetlists(setlistsList);
+        }, (error) => console.error("Firestore setlists sync breakdown:", error));
+
+        return () => unsubscribe();
+    }, []);
+
+    // 3. Mutation Operations: Songs Infrastructure
+    const addSong = async (songData) => {
+        try {
+            await addDoc(collection(db, 'songs'), {
+                name: songData.name || 'Untitled Track',
+                artist: songData.artist || '',
+                key: songData.key || '',
+                bpm: songData.bpm ? parseInt(songData.bpm, 10) : null,
+                voiceType: songData.voiceType || 'Unassigned'
+            });
+        } catch (error) {
+            console.error("Failed adding tracking data node:", error);
+        }
     };
 
-    // Update details of an existing song
-    const updateSong = (updatedSong) => {
-        setSongs(songs.map(s => s.id === updatedSong.id ? updatedSong : s));
-        setEditingSong(null);
+    const deleteSong = async (songId) => {
+        try {
+            await deleteDoc(doc(db, 'songs', songId));
+            // Structural fallback cleanup: remove song relation pointer from all existing setlists
+            setlists.forEach(async (list) => {
+                if (list.songIds.includes(songId)) {
+                    await removeSongFromSetlist(list.id, songId);
+                }
+            });
+        } catch (error) {
+            console.error("Purge mutation pipeline failed:", error);
+        }
     };
 
-    // Delete a song and remove it from all existing setlists
-    const deleteSong = (id) => {
-        setSongs(songs.filter(s => s.id !== id));
-        setSetlists(setlists.map(sl => ({
-            ...sl,
-            songIds: sl.songIds.filter(sid => sid !== id)
-        })));
-        if (editingSong?.id === id) setEditingSong(null);
+    // 4. Mutation Operations: Setlists Workspaces
+    const createSetlist = async (name) => {
+        try {
+            const docRef = await addDoc(collection(db, 'setlists'), {
+                name: name,
+                songIds: []
+            });
+            setActiveSetlistId(docRef.id);
+        } catch (error) {
+            console.error("Failed creating setup workspace matrix:", error);
+        }
     };
 
-    // Create a brand new empty setlist
-    const createSetlist = (name) => {
-        const newSetlist = { id: Date.now().toString(), name, songIds: [] };
-        setSetlists([...setlists, newSetlist]);
-        setActiveSetlistId(newSetlist.id);
-    };
-
-    // Delete an entire setlist
-    const deleteSetlist = (id) => {
-        setSetlists(setlists.filter(sl => sl.id !== id));
-        if (activeSetlistId === id) setActiveSetlistId('');
-    };
-
-    // Append a song to a specific setlist
-    const addSongToSetlist = (setlistId, songId) => {
-        setSetlists(setlists.map(sl => {
-            if (sl.id === setlistId && !sl.songIds.includes(songId)) {
-                return { ...sl, songIds: [...sl.songIds, songId] };
+    const deleteSetlist = async (setlistId) => {
+        try {
+            await deleteDoc(doc(db, 'setlists', setlistId));
+            if (activeSetlistId === setlistId) {
+                setActiveSetlistId('');
             }
-            return sl;
-        }));
+        } catch (error) {
+            console.error("Failed purging active setlist workspace:", error);
+        }
     };
 
-    // Remove a single instance of a song from a setlist
-    const removeSongFromSetlist = (setlistId, songId) => {
-        setSetlists(setlists.map(sl => {
-            if (sl.id === setlistId) {
-                return { ...sl, songIds: sl.songIds.filter(id => id !== songId) };
-            }
-            return sl;
-        }));
+    const addSongToSetlist = async (setlistId, songId) => {
+        try {
+            const setlistRef = doc(db, 'setlists', setlistId);
+            await updateDoc(setlistRef, {
+                songIds: arrayUnion(songId)
+            });
+        } catch (error) {
+            console.error("Relational index push failure:", error);
+        }
     };
 
-    // Overwrite current state with imported data payload
-    const importData = (importedSongs, importedSetlists) => {
-        if (importedSongs) setSongs(importedSongs);
-        if (importedSetlists) setSetlists(importedSetlists);
+    const removeSongFromSetlist = async (setlistId, songId) => {
+        try {
+            const setlistRef = doc(db, 'setlists', setlistId);
+            await updateDoc(setlistRef, {
+                songIds: arrayRemove(songId)
+            });
+        } catch (error) {
+            console.error("Relational index removal failure:", error);
+        }
     };
 
     return (
         <RepertoireContext.Provider value={{
-            songs, addSong, updateSong, deleteSong,
-            setlists, createSetlist, deleteSetlist, addSongToSetlist, removeSongFromSetlist,
-            editingSong, setEditingSong, activeSetlistId, setActiveSetlistId, importData,
-            darkMode, setDarkMode
+            songs,
+            setlists,
+            activeSetlistId,
+            setActiveSetlistId,
+            darkMode,
+            setDarkMode,
+            addSong,
+            deleteSong,
+            createSetlist,
+            deleteSetlist,
+            addSongToSetlist,
+            removeSongFromSetlist
         }}>
             {children}
         </RepertoireContext.Provider>
@@ -83,5 +156,9 @@ export function RepertoireProvider({ children }) {
 }
 
 export function useRepertoire() {
-    return useContext(RepertoireContext);
+    const context = useContext(RepertoireContext);
+    if (!context) {
+        throw new Error('useRepertoire must be wrapped inside a RepertoireProvider node context');
+    }
+    return context;
 }

@@ -1,3 +1,12 @@
+document.title = "ReperOS";
+
+import favicon from './assets/favicon.png';
+
+const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+link.rel = 'icon';
+link.href = favicon;
+document.getElementsByTagName('head')[0].appendChild(link);
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
