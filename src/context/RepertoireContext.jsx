@@ -1,4 +1,3 @@
-// src/context/RepertoireContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
 import { db } from '../firebase';
 import {
@@ -18,6 +17,7 @@ export function RepertoireProvider({ children }) {
     const [songs, setSongs] = useState([]);
     const [setlists, setSetlists] = useState([]);
     const [activeSetlistId, setActiveSetlistId] = useState('');
+    const [editingSong, setEditingSong] = useState(null); // Agregado para que SongForm pueda usarlo sin romper el hook
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem('darkMode') === 'true';
     });
@@ -68,10 +68,34 @@ export function RepertoireProvider({ children }) {
                 artist: songData.artist || '',
                 key: songData.key || '',
                 bpm: songData.bpm ? parseInt(songData.bpm, 10) : null,
-                voiceType: songData.voiceType || 'Unassigned'
+                voiceType: songData.voiceType || 'Unassigned',
+                // 👇 ¡CAMPOS CORREGIDOS ABAJO! Ahora se guardan con éxito en Firebase
+                duration: songData.duration || '',
+                genre: songData.genre || '',
+                description: songData.description || ''
             });
         } catch (error) {
             console.error("Failed adding tracking data node:", error);
+        }
+    };
+
+    // Nueva función añadida: Permite persistir los cambios editados en Firestore
+    const updateSong = async (songData) => {
+        try {
+            const songRef = doc(db, 'songs', songData.id);
+            await updateDoc(songRef, {
+                name: songData.name || 'Untitled Track',
+                artist: songData.artist || '',
+                key: songData.key || '',
+                bpm: songData.bpm ? parseInt(songData.bpm, 10) : null,
+                voiceType: songData.voiceType || 'Unassigned',
+                duration: songData.duration || '',
+                genre: songData.genre || '',
+                description: songData.description || ''
+            });
+            setEditingSong(null); // Resetea el estado de edición al terminar
+        } catch (error) {
+            console.error("Failed updating tracking data node:", error);
         }
     };
 
@@ -144,6 +168,9 @@ export function RepertoireProvider({ children }) {
             darkMode,
             setDarkMode,
             addSong,
+            updateSong,        // Exportado para arreglar tu SongForm
+            editingSong,       // Exportado para arreglar tu SongForm
+            setEditingSong,    // Exportado para arreglar tu SongForm
             deleteSong,
             createSetlist,
             deleteSetlist,

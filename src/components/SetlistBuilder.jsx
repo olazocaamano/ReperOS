@@ -13,6 +13,39 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
     const currentSetlist = setlists.find(sl => sl.id === activeSetlistId);
     const setlistSongs = currentSetlist ? currentSetlist.songIds.map(id => songs.find(s => s.id === id)).filter(Boolean) : [];
 
+    // Helper para sumar las duraciones en formato MM:SS o HH:MM:SS
+    const calculateTotalDuration = (songsList) => {
+        let totalSeconds = 0;
+
+        songsList.forEach(song => {
+            if (!song.duration) return;
+            const parts = song.duration.split(':').map(Number);
+
+            if (parts.length === 2) {
+                // Formato MM:SS
+                totalSeconds += (parts[0] * 60) + parts[1];
+            } else if (parts.length === 3) {
+                // Formato HH:MM:SS
+                totalSeconds += (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+            }
+        });
+
+        if (totalSeconds === 0) return '00:00';
+
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        const pad = (num) => String(num).padStart(2, '0');
+
+        if (hours > 0) {
+            return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+        }
+        return `${pad(minutes)}:${pad(seconds)}`;
+    };
+
+    const totalDurationText = calculateTotalDuration(setlistSongs);
+
     const handleCreate = (e) => {
         e.preventDefault();
         if (!newListName.trim()) return;
@@ -25,8 +58,6 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
         if (!currentSetlist || setlistSongs.length === 0) return;
 
         try {
-            // Initialize jsPDF configuration targeting standard US 'Letter' measurements in millimeters
-            // Letter standard dimensions: 215.9mm x 279.4mm
             const pdf = new jsPDF({
                 orientation: 'p',
                 unit: 'mm',
@@ -34,27 +65,27 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
             });
 
             const pageWidth = 215.9;
-            let currentY = 20; // Structural top padding margin
+            let currentY = 20;
 
-            // 1. Document Canvas Reset - Force pristine white sheet background color properties
+            // 1. Document Canvas Reset
             pdf.setFillColor(255, 255, 255);
             pdf.rect(0, 0, pageWidth, 279.4, 'F');
 
             // 2. Render Document Header Banner Area
             pdf.setFont('Helvetica', 'bold');
             pdf.setFontSize(24);
-            pdf.setTextColor(24, 24, 27); // zinc-900 absolute pitch text color
+            pdf.setTextColor(24, 24, 27); // zinc-900
             pdf.text(currentSetlist.name, 20, currentY);
 
             currentY += 7;
             pdf.setFont('Helvetica', 'normal');
             pdf.setFontSize(10);
-            pdf.setTextColor(113, 113, 122); // zinc-500 subtle gray sub-headline text
-            pdf.text(`Total Tracks: ${setlistSongs.length}  |  Generated Workspace Document`, 20, currentY);
+            pdf.setTextColor(113, 113, 122); // zinc-500
+            // Añadido el tiempo total sumado en los metadatos del PDF
+            pdf.text(`Total Tracks: ${setlistSongs.length}  |  Total Time: ${totalDurationText}  |  Generated Workspace Document`, 20, currentY);
 
             currentY += 5;
-            // Draw minimal clean structural rule divider line underneath header
-            pdf.setDrawColor(228, 228, 231); // zinc-200 border hex tint
+            pdf.setDrawColor(228, 228, 231); // zinc-200
             pdf.setLineWidth(0.5);
             pdf.line(20, currentY, pageWidth - 20, currentY);
 
@@ -62,31 +93,26 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
 
             // 3. Render Track List Lineup Rows Sequentially
             setlistSongs.forEach((song, index) => {
-                // Simple pagination fallback threshold safety boundary check
                 if (currentY > 255) {
                     pdf.addPage('letter', 'p');
-                    // Clear background color setup for subsequent pages as well
                     pdf.setFillColor(255, 255, 255);
                     pdf.rect(0, 0, pageWidth, 279.4, 'F');
                     currentY = 20;
                 }
 
-                // Generate dynamic background row card borders for structural alignment contrast
-                pdf.setFillColor(244, 244, 245); // zinc-100 container row fill background
-                pdf.setDrawColor(228, 228, 231); // zinc-200 boundary edge stroke
+                pdf.setFillColor(244, 244, 245); // zinc-100
+                pdf.setDrawColor(228, 228, 231); // zinc-200
                 pdf.roundedRect(19, currentY - 5, pageWidth - 38, 14, 2, 2, 'FD');
 
-                // Draw structural song position index badge counter
                 pdf.setFont('Courier', 'bold');
                 pdf.setFontSize(10);
-                pdf.setTextColor(161, 161, 170); // zinc-400 number indicator
+                pdf.setTextColor(161, 161, 170); // zinc-400
                 const numericalPrefix = String(index + 1).padStart(2, '0');
                 pdf.text(numericalPrefix, 24, currentY + 3);
 
-                // Render Master Track Metadata Title Layout Block
                 pdf.setFont('Helvetica', 'bold');
                 pdf.setFontSize(11);
-                pdf.setTextColor(24, 24, 27); // zinc-900 track heading text
+                pdf.setTextColor(24, 24, 27); // zinc-900
 
                 let songHeaderString = song.name;
                 if (song.artist) {
@@ -94,34 +120,33 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
                 }
                 pdf.text(songHeaderString, 34, currentY + 1);
 
-                // Render Performance Spec Sub-badges (Duration, Key, BPM, Vocals)
                 pdf.setFont('Helvetica', 'normal');
                 pdf.setFontSize(9);
 
                 let metaSegmentX = 34;
 
                 if (song.duration) {
-                    pdf.setTextColor(59, 130, 246); // blue-500 duration text color
+                    pdf.setTextColor(59, 130, 246); // blue-500
                     pdf.text(song.duration, metaSegmentX, currentY + 5.5);
                     metaSegmentX += pdf.getTextWidth(song.duration) + 3;
 
-                    pdf.setTextColor(212, 212, 216); // zinc-300 delimiter point dot
+                    pdf.setTextColor(212, 212, 216); // zinc-300
                     pdf.text('·', metaSegmentX, currentY + 5.5);
                     metaSegmentX += 3;
                 }
 
                 if (song.key) {
-                    pdf.setTextColor(217, 119, 6); // amber-600 key tuning text color
+                    pdf.setTextColor(217, 119, 6); // amber-600
                     pdf.text(song.key, metaSegmentX, currentY + 5.5);
                     metaSegmentX += pdf.getTextWidth(song.key) + 3;
 
-                    pdf.setTextColor(212, 212, 216); // zinc-300 delimiter point dot
+                    pdf.setTextColor(212, 212, 216);
                     pdf.text('·', metaSegmentX, currentY + 5.5);
                     metaSegmentX += 3;
                 }
 
                 if (song.bpm) {
-                    pdf.setTextColor(220, 38, 38); // red-600 dynamic cadence beat metric tone
+                    pdf.setTextColor(220, 38, 38); // red-600
                     const bpmString = `${song.bpm} BPM`;
                     pdf.text(bpmString, metaSegmentX, currentY + 5.5);
                     metaSegmentX += pdf.getTextWidth(bpmString) + 3;
@@ -131,14 +156,12 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
                     metaSegmentX += 3;
                 }
 
-                pdf.setTextColor(113, 113, 122); // zinc-500 standard vocal role descriptor profile
+                pdf.setTextColor(113, 113, 122); // zinc-500
                 pdf.text(song.voiceType, metaSegmentX, currentY + 5.5);
 
-                // Offset layout tracking baseline pivot position marker to next item iteration
                 currentY += 18;
             });
 
-            // 4. Fire localized browser filesystem save dispatch stream event
             const cleanFileName = currentSetlist.name.replace(/\s+/g, '_');
             pdf.save(`Setlist_${cleanFileName}.pdf`);
 
@@ -151,8 +174,7 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
     return (
         <div className="space-y-6 w-full">
             {/* Setlist Management Dashboard Card Control Panel */}
-            <div className={`p-6 rounded-xl border shadow-lg transition-colors ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'
-                }`}>
+            <div className={`p-6 rounded-xl border shadow-lg transition-colors ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}`}>
                 <div className="flex items-center gap-2 mb-4">
                     <Layers className="text-emerald-500" size={22} />
                     <h2 className="text-xl font-bold">Setlist Manager</h2>
@@ -164,8 +186,7 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
                         placeholder="Gig Name / Date..."
                         value={newListName}
                         onChange={(e) => setNewListName(e.target.value)}
-                        className={`flex-1 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors ${darkMode ? 'bg-black border-zinc-800 text-white focus:border-zinc-700' : 'bg-zinc-50 border-zinc-300 text-zinc-900'
-                            }`}
+                        className={`flex-1 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors ${darkMode ? 'bg-black border-zinc-800 text-white focus:border-zinc-700' : 'bg-zinc-50 border-zinc-300 text-zinc-900'}`}
                     />
                     <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded-lg transition-colors cursor-pointer">
                         <Plus size={18} />
@@ -180,8 +201,7 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
                         <select
                             value={activeSetlistId}
                             onChange={(e) => setActiveSetlistId(e.target.value)}
-                            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition-colors ${darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-zinc-50 border-zinc-300 text-zinc-900'
-                                }`}
+                            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition-colors ${darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-zinc-50 border-zinc-300 text-zinc-900'}`}
                         >
                             <option value="">-- Select Setlist --</option>
                             {setlists.map(sl => (
@@ -194,15 +214,13 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
 
             {/* Target Active Lineup Paper Sheet Workspace Interface */}
             {currentSetlist ? (
-                <div className={`rounded-xl border overflow-hidden shadow-lg transition-colors ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'
-                    }`}>
+                <div className={`rounded-xl border overflow-hidden shadow-lg transition-colors ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}`}>
                     {/* Top Header Utility Action Control Bar */}
                     <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'bg-zinc-800/40 border-zinc-800' : 'bg-zinc-50 border-zinc-200'}`}>
                         <span className="text-sm font-semibold flex items-center gap-2">
                             <ListMusic size={18} /> Lineup
                         </span>
                         <div className="flex gap-2">
-                            {/* Omit PDF Generation engine render block context if executed within APK bundle wrapper */}
                             {!isMobile && (
                                 <button
                                     onClick={handleExportPDF}
@@ -213,7 +231,6 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
                                 </button>
                             )}
 
-                            {/* Trigger viewport matrix expansion swap if executing workspace context within a mobile device */}
                             {isMobile && (
                                 <button
                                     onClick={() => onMobileExpand(currentSetlist.id)}
@@ -226,21 +243,27 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
 
                             <button
                                 onClick={() => deleteSetlist(currentSetlist.id)}
-                                className={`p-1.5 rounded-md border transition-colors cursor-pointer ${darkMode ? 'bg-zinc-800 hover:bg-red-950/40 border-zinc-700 text-red-400' : 'bg-zinc-100 hover:bg-red-50 border-zinc-200 text-red-600'
-                                    }`}
+                                className={`p-1.5 rounded-md border transition-colors cursor-pointer ${darkMode ? 'bg-zinc-800 hover:bg-red-950/40 border-zinc-700 text-red-400' : 'bg-zinc-100 hover:bg-red-50 border-zinc-200 text-red-600'}`}
                             >
                                 <Trash2 size={14} />
                             </button>
                         </div>
                     </div>
 
-                    {/* VIRTUAL WORKSPACE VISUAL DISPLAY: Stays beautiful pure black on screen */}
+                    {/* VIRTUAL WORKSPACE VISUAL DISPLAY */}
                     <div id="printable-setlist" className={`p-6 space-y-4 ${darkMode ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
-                        <div className={`border-b pb-3 ${darkMode ? 'border-zinc-800' : 'border-zinc-200'}`}>
-                            <h1 className="text-2xl font-bold tracking-wide">{currentSetlist.name}</h1>
-                            <p className={`text-xs mt-1 ${darkMode ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                                Total Items: {setlistSongs.length}
-                            </p>
+                        <div className={`border-b pb-3 flex justify-between items-end ${darkMode ? 'border-zinc-800' : 'border-zinc-200'}`}>
+                            <div>
+                                <h1 className="text-2xl font-bold tracking-wide">{currentSetlist.name}</h1>
+                                <p className={`text-xs mt-1 ${darkMode ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                                    Total Items: {setlistSongs.length}
+                                </p>
+                            </div>
+                            {/* Muestra el tiempo total calculado en la esquina superior derecha del contenedor de la lista */}
+                            <div className="text-right">
+                                <span className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-zinc-500' : 'text-zinc-400'}`}>Duration</span>
+                                <p className="text-lg font-mono font-bold text-blue-500">{totalDurationText}</p>
+                            </div>
                         </div>
 
                         {setlistSongs.length === 0 ? (
@@ -250,11 +273,9 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
                         ) : (
                             <div className="space-y-2">
                                 {setlistSongs.map((song, index) => (
-                                    <div key={`${song.id}-${index}`} className={`group p-3 rounded-lg border flex justify-between items-center ${darkMode ? 'bg-zinc-900/60 border-zinc-900' : 'bg-zinc-50 border-zinc-100'
-                                        }`}>
+                                    <div key={`${song.id}-${index}`} className={`group p-3 rounded-lg border flex justify-between items-center ${darkMode ? 'bg-zinc-900/60 border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
                                         <div className="flex items-center gap-3">
-                                            <span className={`font-mono text-xs w-6 h-6 rounded-full flex items-center justify-center border ${darkMode ? 'bg-black text-zinc-600 border-zinc-900' : 'bg-white text-zinc-400 border-zinc-200'
-                                                }`}>
+                                            <span className={`font-mono text-xs w-6 h-6 rounded-full flex items-center justify-center border ${darkMode ? 'bg-black text-zinc-600 border-zinc-900' : 'bg-white text-zinc-400 border-zinc-200'}`}>
                                                 {String(index + 1).padStart(2, '0')}
                                             </span>
 
@@ -289,8 +310,7 @@ export default function SetlistBuilder({ isMobile, onMobileExpand }) {
                     </div>
                 </div>
             ) : (
-                <div className={`border border-dashed rounded-xl p-8 text-center text-sm ${darkMode ? 'border-zinc-800 text-zinc-600' : 'border-zinc-300 text-zinc-400'
-                    }`}>
+                <div className={`border border-dashed rounded-xl p-8 text-center text-sm ${darkMode ? 'border-zinc-800 text-zinc-600' : 'border-zinc-300 text-zinc-400'}`}>
                     No show setup active. Use the manager above to build a list.
                 </div>
             )}

@@ -34,23 +34,27 @@ export default function SongForm() {
         setFormData({ name: '', artist: '', key: '', bpm: '', genre: '', voiceType: 'Male', description: '', duration: '' });
     };
 
-    // Helper para auto-formatear la entrada numérica a estructura MM:SS
+    // Helper optimizado para auto-formatear con precisión estricta a estructura MM:SS
     const handleDurationChange = (e) => {
-        let val = e.target.value.replace(/\D/g, ''); // Remueve cualquier caracter que no sea número
+        let val = e.target.value.replace(/\D/g, ''); // Remueve cualquier carácter que no sea número
+
+        // Corta el exceso de números de seguridad si intentan inyectar más de 4 dígitos
+        if (val.length > 4) val = val.slice(0, 4);
+
         if (val.length > 2) {
-            val = val.slice(0, 2) + ':' + val.slice(2, 4);
+            // Inserta los dos puntos de manera dinámica y limpia
+            val = val.slice(0, 2) + ':' + val.slice(2);
         }
+
         setFormData({ ...formData, duration: val });
     };
 
-    const inputClass = `w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors ${
-        darkMode ? 'bg-black border-zinc-800 text-white focus:border-zinc-700' : 'bg-zinc-50 border-zinc-300 text-zinc-900'
-    }`;
+    const inputClass = `w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors ${darkMode ? 'bg-black border-zinc-800 text-white focus:border-zinc-700' : 'bg-zinc-50 border-zinc-300 text-zinc-900'
+        }`;
 
     return (
-        <form onSubmit={handleSubmit} className={`p-6 rounded-xl shadow-lg border w-full transition-colors ${
-            darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'
-        }`}>
+        <form onSubmit={handleSubmit} className={`p-6 rounded-xl shadow-lg border w-full transition-colors ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'
+            }`}>
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                     <Music className={editingSong ? "text-amber-400" : "text-blue-500"} size={24} />
@@ -94,13 +98,13 @@ export default function SongForm() {
                     </div>
                     <div>
                         <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-zinc-300' : 'text-zinc-600'}`}>Duration (MM:SS)</label>
-                        <input 
-                            type="text" 
-                            placeholder="e.g., 03:45" 
-                            maxLength="5" 
-                            value={formData.duration} 
-                            onChange={handleDurationChange} 
-                            className={`${inputClass} font-mono`} 
+                        <input
+                            type="text"
+                            placeholder="e.g., 03:45"
+                            maxLength="5"
+                            value={formData.duration}
+                            onChange={handleDurationChange}
+                            className={`${inputClass} font-mono`}
                         />
                     </div>
                 </div>
@@ -122,9 +126,8 @@ export default function SongForm() {
 
                 <button
                     type="submit"
-                    className={`w-full font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors mt-2 text-white ${
-                        editingSong ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-600 hover:bg-blue-500'
-                    }`}
+                    className="w-full font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors mt-2 text-white bg-blue-600 hover:bg-blue-500 dark:bg-blue-600 dark:hover:bg-blue-500"
+                    style={editingSong ? { backgroundColor: '#d97706' } : {}} // Aplica el color ámbar dinámico si edita sin romper clases base
                 >
                     {editingSong ? <Save size={20} /> : <Plus size={20} />}
                     {editingSong ? 'Save Modifications' : 'Commit to Repertoire'}
